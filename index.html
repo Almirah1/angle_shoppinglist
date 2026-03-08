@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Our Groceries" />
+  <title>Our Groceries</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { background: #13131f; font-family: -apple-system, 'SF Pro Text', Arial, sans-serif; }
+
+    /* Header */
+    #header {
+      background: #13131f;
+      border-bottom: 1px solid #2a2a3d;
+      padding: 12px 16px;
+      padding-top: calc(12px + env(safe-area-inset-top, 0px));
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    #header h1 { font-size: 20px; color: #fff; font-weight: 900; letter-spacing: -0.5px; }
+    #header h1 span { color: #ff6b6b; }
+    #user-btn {
+      background: #1e1e30;
+      border: 1px solid #2a2a3d;
+      border-radius: 20px;
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+    }
+    #user-avatar {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: #444;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 900; color: #13131f; flex-shrink: 0;
+    }
+    #user-name { font-size: 13px; font-weight: 700; color: #888; }
+    #user-caret { font-size: 10px; color: #555; }
+
+    /* Settings panel */
+    #settings {
+      display: none;
+      position: sticky;
+      top: 53px;
+      z-index: 15;
+      background: #1a1a2e;
+      border-bottom: 1px solid #2a2a3d;
+      padding: 14px 16px;
+    }
+    #settings.open { display: block; }
+    #settings .label {
+      font-size: 11px; color: #555; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;
+    }
+    #settings .user-options { display: flex; gap: 10px; }
+    .user-option {
+      flex: 1;
+      background: #13131f;
+      border: 2px solid #2a2a3d;
+      border-radius: 12px;
+      padding: 11px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .user-option .avatar {
+      width: 34px; height: 34px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 900; color: #13131f; flex-shrink: 0;
+    }
+    .user-option .uname { color: #fff; font-size: 14px; font-weight: 700; }
+    .user-option .active-label { font-size: 11px; margin-top: 2px; }
+
+    /* Banners */
+    #no-user-banner {
+      background: #eec94215;
+      border-bottom: 1px solid #eec94233;
+      padding: 10px 16px;
+      text-align: center;
+      font-size: 13px;
+      color: #eec942;
+    }
+    #error-banner {
+      display: none;
+      background: #ff6b6b15;
+      border-bottom: 1px solid #ff6b6b33;
+      padding: 10px 16px;
+      text-align: center;
+      font-size: 13px;
+      color: #ff6b6b;
+    }
+
+    /* Main content */
+    #main {
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 16px 14px;
+      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 40px);
+    }
+
+    /* Add item */
+    #add-box {
+      background: #1e1e30;
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 20px;
+      border: 1px solid #2a2a3d;
+      display: flex;
+      gap: 8px;
+    }
+    #new-item-input {
+      flex: 1;
+      background: #13131f;
+      border: 1.5px solid #2a2a3d;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 16px;
+      color: #fff;
+      outline: none;
+      font-family: inherit;
+      -webkit-appearance: none;
+      transition: border-color 0.2s;
+    }
+    #new-item-input::placeholder { color: #444; }
+    #new-item-input:disabled { color: #555; }
+    #add-btn {
+      background: #2a2a3d;
+      color: #555;
+      border: none;
+      border-radius: 12px;
+      width: 48px;
+      font-size: 26px;
+      font-weight: 900;
+      line-height: 1;
+      flex-shrink: 0;
+      cursor: default;
+      transition: all 0.15s;
+    }
+    #add-btn.ready { cursor: pointer; color: #13131f; }
+
+    /* Section headers */
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .section-count {
+      background: #2a2a3d;
+      color: #666;
+      border-radius: 6px;
+      padding: 2px 7px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    #clear-btn {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: #555;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 2px 6px;
+      font-family: inherit;
+    }
+
+    /* Sections */
+    #needed-section { margin-bottom: 24px; }
+    #divider { border: none; border-top: 1px solid #2a2a3d; margin-bottom: 20px; display: none; }
+    #bought-section { display: none; }
+
+    #list, #bought-list { display: flex; flex-direction: column; gap: 10px; }
+
+    /* Item card */
+    .item-card {
+      background: #1e1e30;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #2a2a3d;
+      transition: opacity 0.2s;
+    }
+    .item-card.done { opacity: 0.55; }
+    .item-card.pop { animation: popIn 0.3s ease; }
+    .card-row {
+      padding: 13px 13px 10px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+    .card-avatar {
+      width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 900;
+    }
+    .card-name {
+      flex: 1;
+      font-weight: 700;
+      font-size: 16px;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .item-card.done .card-name {
+      color: #555;
+      text-decoration: line-through;
+    }
+    .card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .got-btn {
+      background: #eec94222;
+      border: 1px solid #eec94255;
+      border-radius: 10px;
+      padding: 8px 13px;
+      color: #eec942;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      min-height: 44px;
+      font-family: inherit;
+    }
+    .undo-btn {
+      background: #2a2a3d;
+      border: 1px solid #3a3a50;
+      border-radius: 10px;
+      padding: 8px 12px;
+      color: #666;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      min-height: 44px;
+      font-family: inherit;
+    }
+    .del-btn {
+      background: #ff6b6b22;
+      border: 1px solid #ff6b6b44;
+      border-radius: 10px;
+      padding: 8px 11px;
+      color: #ff6b6b;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+      line-height: 1;
+      min-height: 44px;
+      min-width: 44px;
+      font-family: inherit;
+    }
+    .bought-strip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 13px;
+    }
+    .bought-avatar {
+      width: 18px; height: 18px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 900; color: #13131f; flex-shrink: 0;
+    }
+    .bought-name { font-size: 12px; font-weight: 600; }
+    .bought-time { font-size: 11px; color: #444; margin-left: 4px; }
+
+    /* Empty / loading states */
+    #loading, #empty {
+      text-align: center;
+      padding: 64px 20px;
+      color: #555;
+      font-size: 14px;
+    }
+    #loading { color: #444; padding: 60px; }
+
+    /* Sync dot */
+    #sync {
+      text-align: center;
+      font-size: 11px;
+      color: #333;
+      margin-top: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    #sync-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #4ecdc4;
+      display: inline-block;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    @keyframes popIn { 0%{transform:scale(0.93);opacity:0.4} 100%{transform:scale(1);opacity:1} }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div id="header">
+  <h1>Our<span>Groceries</span></h1>
+  <button id="user-btn" onclick="toggleSettings()">
+    <div id="user-avatar">?</div>
+    <span id="user-name">Who are you?</span>
+    <span id="user-caret">▼</span>
+  </button>
+</div>
+
+<!-- Settings -->
+<div id="settings">
+  <div class="label">Who's using this?</div>
+  <div class="user-options">
+    <button class="user-option" id="opt-angela" onclick="switchUser('angela')">
+      <div class="avatar" style="background:#ff6b6b">A</div>
+      <div>
+        <div class="uname">Angela</div>
+        <div class="active-label" id="active-angela" style="color:#ff6b6b;display:none">● Active</div>
+      </div>
+    </button>
+    <button class="user-option" id="opt-brad" onclick="switchUser('brad')">
+      <div class="avatar" style="background:#4ecdc4">B</div>
+      <div>
+        <div class="uname">Brad</div>
+        <div class="active-label" id="active-brad" style="color:#4ecdc4;display:none">● Active</div>
+      </div>
+    </button>
+  </div>
+</div>
+
+<!-- Banners -->
+<div id="no-user-banner">Tap your name above to get started ↑</div>
+<div id="error-banner">⚠️ Couldn't connect to database — retrying...</div>
+
+<!-- Main -->
+<div id="main">
+  <div id="add-box">
+    <input id="new-item-input" type="text" placeholder="Set your name above first" disabled
+      oninput="onInputChange()" onkeydown="if(event.key==='Enter') addItem()"
+      onfocus="onInputFocus()" onblur="onInputBlur()" />
+    <button id="add-btn" onclick="addItem()">+</button>
+  </div>
+
+  <div id="loading">Loading...</div>
+  <div id="empty" style="display:none">
+    <div style="font-size:40px;margin-bottom:12px">🛒</div>
+    List is empty — add something above
+  </div>
+
+  <div id="needed-section" style="display:none">
+    <div class="section-header">
+      <span class="section-title">Needed</span>
+      <span class="section-count" id="needed-count">0</span>
+    </div>
+    <div id="list"></div>
+  </div>
+
+  <hr id="divider" />
+
+  <div id="bought-section">
+    <div class="section-header">
+      <span class="section-title">Bought</span>
+      <span class="section-count" id="bought-count">0</span>
+      <button id="clear-btn" onclick="clearDone()">Clear ✕</button>
+    </div>
+    <div id="bought-list"></div>
+  </div>
+
+  <div id="sync">
+    <span id="sync-dot"></span>
+    <span id="sync-label">Live sync</span>
+  </div>
+</div>
+
+<script>
+  const SUPABASE_URL = 'https://edyuizgeyqrnkijvvufx.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeXVpemdleXFybmtpanZ2dWZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4MjkxMTcsImV4cCI6MjA4NjQwNTExN30.8zVQP7LbZaj6DOu7KL_tJSjvrDTpHxjTDWL7fMZeaLk';
+  const TABLE = 'groceries';
+
+  const USERS = {
+    angela: { name: 'Angela', color: '#ff6b6b', initial: 'A' },
+    brad:   { name: 'Brad',   color: '#4ecdc4', initial: 'B' },
+  };
+
+  let currentUser = localStorage.getItem('angela-brad-whoami') || null;
+  let items = [];
+  let settingsOpen = false;
+
+  // ── Supabase ──────────────────────────────────────────────────
+  async function sbFetch(path, options = {}) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      ...options,
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation',
+        ...(options.headers || {}),
+      },
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  }
+
+  async function fetchItems() {
+    const rows = await sbFetch(`${TABLE}?order=added_at.asc`);
+    return (rows || []).map(r => ({
+      id: r.id, name: r.name,
+      addedBy: r.added_by, addedAt: r.added_at,
+      claimedBy: r.claimed_by, claimedAt: r.claimed_at,
+      done: r.done,
+    }));
+  }
+
+  async function insertItem(item) {
+    await sbFetch(TABLE, {
+      method: 'POST',
+      body: JSON.stringify({
+        id: item.id, name: item.name,
+        added_by: item.addedBy, added_at: item.addedAt,
+        claimed_by: item.claimedBy, claimed_at: item.claimedAt,
+        done: item.done,
+      }),
+    });
+  }
+
+  async function updateItem(id, patch) {
+    const db = {};
+    if ('claimedBy' in patch) db.claimed_by = patch.claimedBy;
+    if ('claimedAt' in patch) db.claimed_at = patch.claimedAt;
+    if ('done'      in patch) db.done       = patch.done;
+    await sbFetch(`${TABLE}?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(db) });
+  }
+
+  async function deleteItem(id)  { await sbFetch(`${TABLE}?id=eq.${id}`,  { method: 'DELETE' }); }
+  async function deleteDoneRows() { await sbFetch(`${TABLE}?done=eq.true`, { method: 'DELETE' }); }
+
+  // ── Helpers ───────────────────────────────────────────────────
+  function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2);
+  }
+
+  function fmtDate(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const today = new Date();
+    const yesterday = new Date(); yesterday.setDate(today.getDate() - 1);
+    const timeStr = d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true });
+    if (d.toDateString() === today.toDateString())     return `Today ${timeStr}`;
+    if (d.toDateString() === yesterday.toDateString()) return `Yesterday ${timeStr}`;
+    return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) + ' ' + timeStr;
+  }
+
+  // ── Render ────────────────────────────────────────────────────
+  function render() {
+    const pending = items.filter(i => !i.done);
+    const done    = items.filter(i =>  i.done);
+    const other   = Object.entries(USERS).find(([k]) => k !== (currentUser || 'angela'));
+
+    // States
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('empty').style.display = items.length === 0 ? 'block' : 'none';
+    document.getElementById('needed-section').style.display = pending.length > 0 ? 'block' : 'none';
+    document.getElementById('divider').style.display = (pending.length > 0 && done.length > 0) ? 'block' : 'none';
+    document.getElementById('bought-section').style.display = done.length > 0 ? 'block' : 'none';
+
+    document.getElementById('needed-count').textContent = pending.length;
+    document.getElementById('bought-count').textContent  = done.length;
+
+    document.getElementById('list').innerHTML       = pending.map(cardHTML).join('');
+    document.getElementById('bought-list').innerHTML = done.map(cardHTML).join('');
+
+    document.getElementById('sync-label').textContent = `Live sync with ${other[1].name}`;
+    document.getElementById('sync-dot').style.background = '#4ecdc4';
+  }
+
+  function cardHTML(item) {
+    const adder   = USERS[item.addedBy];
+    const claimer = item.claimedBy ? USERS[item.claimedBy] : null;
+    const isMyItem   = item.addedBy === currentUser;
+    const iClaimedIt = item.claimedBy === currentUser;
+    const canUndo    = item.done && (iClaimedIt || isMyItem);
+
+    const actionBtn = !item.done
+      ? `<button class="got-btn" onclick="claimItem('${item.id}')">✓ Got it</button>`
+      : canUndo
+        ? `<button class="undo-btn" onclick="unclaimItem('${item.id}')">Undo</button>`
+        : '';
+
+    const delBtn = (isMyItem || iClaimedIt)
+      ? `<button class="del-btn" onclick="removeItem('${item.id}')">✕</button>`
+      : '';
+
+    const boughtStrip = item.done && claimer ? `
+      <div class="bought-strip" style="background:${claimer.color}11;border-top:1px solid ${claimer.color}22">
+        <div class="bought-avatar" style="background:${claimer.color}">${claimer.initial}</div>
+        <span class="bought-name" style="color:${claimer.color}cc">${claimer.name} bought this</span>
+        ${item.claimedAt ? `<span class="bought-time">· ${fmtDate(item.claimedAt)}</span>` : ''}
+      </div>` : '';
+
+    return `
+      <div class="item-card ${item.done ? 'done' : ''}" id="card-${item.id}">
+        <div class="card-row">
+          <div class="card-avatar" style="background:${adder.color}22;border:2px solid ${adder.color};color:${adder.color}">${adder.initial}</div>
+          <div class="card-name">${escHtml(item.name)}</div>
+          <div class="card-actions">${actionBtn}${delBtn}</div>
+        </div>
+        ${boughtStrip}
+      </div>`;
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── User UI ───────────────────────────────────────────────────
+  function updateUserUI() {
+    const me = currentUser ? USERS[currentUser] : null;
+    const avatar = document.getElementById('user-avatar');
+    const nameEl = document.getElementById('user-name');
+
+    if (me) {
+      avatar.textContent = me.initial;
+      avatar.style.background = me.color;
+      nameEl.textContent = me.name;
+      nameEl.style.color = me.color;
+    } else {
+      avatar.textContent = '?';
+      avatar.style.background = '#444';
+      nameEl.textContent = 'Who are you?';
+      nameEl.style.color = '#888';
+    }
+
+    // Active indicators
+    ['angela','brad'].forEach(k => {
+      const opt = document.getElementById(`opt-${k}`);
+      const active = document.getElementById(`active-${k}`);
+      const u = USERS[k];
+      opt.style.background = currentUser === k ? u.color + '22' : '#13131f';
+      opt.style.border = `2px solid ${currentUser === k ? u.color : '#2a2a3d'}`;
+      active.style.display = currentUser === k ? 'block' : 'none';
+    });
+
+    // Input
+    const input = document.getElementById('new-item-input');
+    const addBtn = document.getElementById('add-btn');
+    input.disabled = !currentUser;
+    input.placeholder = currentUser ? 'Add an item...' : 'Set your name above first';
+
+    // Banners
+    document.getElementById('no-user-banner').style.display = (!currentUser && !settingsOpen) ? 'block' : 'none';
+
+    updateAddBtn();
+  }
+
+  function updateAddBtn() {
+    const input = document.getElementById('new-item-input');
+    const btn = document.getElementById('add-btn');
+    const ready = input.value.trim() && currentUser;
+    btn.classList.toggle('ready', !!ready);
+    btn.style.background = ready ? USERS[currentUser].color : '#2a2a3d';
+  }
+
+  function toggleSettings() {
+    settingsOpen = !settingsOpen;
+    document.getElementById('settings').classList.toggle('open', settingsOpen);
+    document.getElementById('user-caret').textContent = settingsOpen ? '▲' : '▼';
+    document.getElementById('no-user-banner').style.display = (!currentUser && !settingsOpen) ? 'block' : 'none';
+  }
+
+  function switchUser(u) {
+    currentUser = u;
+    localStorage.setItem('angela-brad-whoami', u);
+    settingsOpen = false;
+    document.getElementById('settings').classList.remove('open');
+    document.getElementById('user-caret').textContent = '▼';
+    updateUserUI();
+    render();
+  }
+
+  // ── Input events ──────────────────────────────────────────────
+  function onInputChange() { updateAddBtn(); }
+
+  function onInputFocus() {
+    if (!currentUser) return;
+    document.getElementById('new-item-input').style.borderColor = USERS[currentUser].color;
+  }
+
+  function onInputBlur() {
+    document.getElementById('new-item-input').style.borderColor = '#2a2a3d';
+  }
+
+  // ── Actions ───────────────────────────────────────────────────
+  async function addItem() {
+    const input = document.getElementById('new-item-input');
+    const name = input.value.trim();
+    if (!name || !currentUser) return;
+
+    const item = { id: generateId(), name, addedBy: currentUser, addedAt: Date.now(), claimedBy: null, claimedAt: null, done: false };
+    items.push(item);
+    input.value = '';
+    updateAddBtn();
+    render();
+
+    // Pop animation
+    const card = document.getElementById(`card-${item.id}`);
+    if (card) { card.classList.add('pop'); setTimeout(() => card.classList.remove('pop'), 400); }
+
+    try { await insertItem(item); } catch { await refresh(); }
+  }
+
+  async function claimItem(id) {
+    const patch = { claimedBy: currentUser, claimedAt: Date.now(), done: true };
+    items = items.map(i => i.id === id ? { ...i, ...patch } : i);
+    render();
+    try { await updateItem(id, patch); } catch { await refresh(); }
+  }
+
+  async function unclaimItem(id) {
+    const patch = { claimedBy: null, claimedAt: null, done: false };
+    items = items.map(i => i.id === id ? { ...i, ...patch } : i);
+    render();
+    try { await updateItem(id, patch); } catch { await refresh(); }
+  }
+
+  async function removeItem(id) {
+    items = items.filter(i => i.id !== id);
+    render();
+    try { await deleteItem(id); } catch { await refresh(); }
+  }
+
+  async function clearDone() {
+    items = items.filter(i => !i.done);
+    render();
+    try { await deleteDoneRows(); } catch { await refresh(); }
+  }
+
+  // ── Data refresh ──────────────────────────────────────────────
+  async function refresh() {
+    try {
+      items = await fetchItems();
+      document.getElementById('error-banner').style.display = 'none';
+      document.getElementById('sync-dot').style.background = '#4ecdc4';
+    } catch {
+      document.getElementById('error-banner').style.display = 'block';
+      document.getElementById('sync-dot').style.background = '#ff6b6b';
+    }
+    render();
+  }
+
+  // ── Init ──────────────────────────────────────────────────────
+  updateUserUI();
+  refresh();
+  setInterval(refresh, 4000);
+</script>
+</body>
+</html>
