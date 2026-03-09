@@ -211,16 +211,16 @@
     }
     .card-name {
       flex: 1;
+      min-width: 0;
       font-weight: 700;
       font-size: 16px;
       color: #fff;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      word-break: break-word;
     }
     .item-card.done .card-name {
       color: #555;
       text-decoration: line-through;
+      text-decoration-color: #555;
     }
     .card-actions { display: flex; gap: 6px; flex-shrink: 0; }
     .got-btn {
