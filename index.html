@@ -115,11 +115,9 @@
       padding: 14px;
       margin-bottom: 20px;
       border: 1px solid #2a2a3d;
-      display: flex;
-      gap: 8px;
     }
     #new-item-input {
-      flex: 1;
+      width: 100%;
       background: #13131f;
       border: 1.5px solid #2a2a3d;
       border-radius: 12px;
@@ -130,18 +128,33 @@
       font-family: inherit;
       -webkit-appearance: none;
       transition: border-color 0.2s;
+      resize: none;
+      min-height: 48px;
+      max-height: 160px;
+      overflow-y: auto;
+      line-height: 1.5;
+      display: block;
+      margin-bottom: 10px;
+      box-sizing: border-box;
     }
     #new-item-input::placeholder { color: #444; }
     #new-item-input:disabled { color: #555; }
+    #add-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    #add-hint { font-size: 11px; color: #444; }
     #add-btn {
       background: #2a2a3d;
       color: #555;
       border: none;
       border-radius: 12px;
-      width: 48px;
-      font-size: 26px;
-      font-weight: 900;
-      line-height: 1;
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 700;
+      font-family: inherit;
       flex-shrink: 0;
       cursor: default;
       transition: all 0.15s;
@@ -347,10 +360,13 @@
 <!-- Main -->
 <div id="main">
   <div id="add-box">
-    <input id="new-item-input" type="text" placeholder="Set your name above first" disabled
-      oninput="onInputChange()" onkeydown="if(event.key==='Enter') addItem()"
-      onfocus="onInputFocus()" onblur="onInputBlur()" />
-    <button id="add-btn" onclick="addItem()">+</button>
+    <textarea id="new-item-input" rows="1" placeholder="Set your name above first" disabled
+      oninput="onInputChange()" onkeydown="onInputKeyDown(event)"
+      onfocus="onInputFocus()" onblur="onInputBlur()"></textarea>
+    <div id="add-row">
+      <span id="add-hint"></span>
+      <button id="add-btn" onclick="addItem()">Add</button>
+    </div>
   </div>
 
   <div id="loading">Loading...</div>
@@ -558,7 +574,7 @@
     const input = document.getElementById('new-item-input');
     const addBtn = document.getElementById('add-btn');
     input.disabled = !currentUser;
-    input.placeholder = currentUser ? 'Add an item...' : 'Set your name above first';
+    input.placeholder = currentUser ? 'Add an item...\nAdd another...' : 'Set your name above first';
 
     // Banners
     document.getElementById('no-user-banner').style.display = (!currentUser && !settingsOpen) ? 'block' : 'none';
@@ -569,9 +585,21 @@
   function updateAddBtn() {
     const input = document.getElementById('new-item-input');
     const btn = document.getElementById('add-btn');
-    const ready = input.value.trim() && currentUser;
+    const hint = document.getElementById('add-hint');
+    const lines = input.value.split('\n').map(l => l.trim()).filter(Boolean);
+    const ready = lines.length > 0 && currentUser;
     btn.classList.toggle('ready', !!ready);
     btn.style.background = ready ? USERS[currentUser].color : '#2a2a3d';
+    if (lines.length > 1) {
+      btn.textContent = `Add ${lines.length} items`;
+      hint.textContent = 'One item per line';
+    } else {
+      btn.textContent = 'Add';
+      hint.textContent = currentUser ? 'New line = new item' : '';
+    }
+    // Auto-resize textarea
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 160) + 'px';
   }
 
   function toggleSettings() {
@@ -603,23 +631,40 @@
     document.getElementById('new-item-input').style.borderColor = '#2a2a3d';
   }
 
+  function onInputKeyDown(e) {
+    // Cmd/Ctrl+Enter submits; plain Enter just adds a new line
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      addItem();
+    }
+  }
+
   // ── Actions ───────────────────────────────────────────────────
   async function addItem() {
     const input = document.getElementById('new-item-input');
-    const name = input.value.trim();
-    if (!name || !currentUser) return;
+    const names = input.value.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!names.length || !currentUser) return;
 
-    const item = { id: generateId(), name, addedBy: currentUser, addedAt: Date.now(), claimedBy: null, claimedAt: null, done: false };
-    items.push(item);
+    const newItems = names.map(name => ({
+      id: generateId(), name, addedBy: currentUser, addedAt: Date.now(),
+      claimedBy: null, claimedAt: null, done: false
+    }));
+
+    newItems.forEach(item => items.push(item));
     input.value = '';
+    input.style.height = '48px';
     updateAddBtn();
     render();
 
-    // Pop animation
-    const card = document.getElementById(`card-${item.id}`);
-    if (card) { card.classList.add('pop'); setTimeout(() => card.classList.remove('pop'), 400); }
+    // Pop animations
+    newItems.forEach(item => {
+      const card = document.getElementById(`card-${item.id}`);
+      if (card) { card.classList.add('pop'); setTimeout(() => card.classList.remove('pop'), 400); }
+    });
 
-    try { await insertItem(item); } catch { await refresh(); }
+    try {
+      await Promise.all(newItems.map(insertItem));
+    } catch { await refresh(); }
   }
 
   async function claimItem(id) {
