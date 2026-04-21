@@ -621,7 +621,7 @@
   }
 
   async function fetchItems() {
-    const rows = await sbFetch(`${TABLE}?order=added_at.asc`);
+    const rows = await sbFetch(`${TABLE}?order=added_at.desc`);
     return (rows || []).map(r => ({
       id: r.id, name: r.name, category: r.category || categories[0]?.id,
       addedBy: r.added_by, addedAt: r.added_at,
