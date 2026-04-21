@@ -1095,49 +1095,130 @@
   }
 
   async function requestPushPermission() {
-    if (!currentUser) { alert('Please select your name first (top right)'); return; }
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      alert('Push notifications are not supported. Make sure you have added the app to your home screen.');
+    const btn = document.getElementById('notif-btn');
+    const text = document.getElementById('notif-status-text');
+
+    if (!currentUser) {
+      alert('Please select your name first (tap the button in the top right)');
       return;
     }
-    await doRegisterPush();
-    updateNotifUI();
+
+    // Check basic support
+    if (!('serviceWorker' in navigator)) {
+      text.textContent = 'Service workers not supported. Open from your home screen icon.';
+      updateNotifUI(); return;
+    }
+    if (!('Notification' in window)) {
+      text.textContent = 'Notifications not supported on this browser/device.';
+      updateNotifUI(); return;
+    }
+    if (!('PushManager' in window)) {
+      text.textContent = 'Push not supported. Make sure app is opened from home screen.';
+      updateNotifUI(); return;
+    }
+
+    btn.textContent = 'Setting up...';
+    btn.disabled = true;
+
+    try {
+      // Step 1: Request permission FIRST (must be in direct user gesture on iOS)
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        btn.disabled = false;
+        btn.textContent = 'Enable Notifications';
+        updateNotifUI(); return;
+      }
+
+      // Step 2: Register service worker
+      let reg;
+      try {
+        reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      } catch (e) {
+        console.error('SW register failed:', e);
+        text.textContent = 'Service worker failed: ' + e.message;
+        btn.disabled = false; btn.textContent = 'Try Again';
+        return;
+      }
+
+      // Step 3: Wait for SW to be ready
+      await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('SW ready timeout')), 8000))
+      ]);
+
+      // Step 4: Subscribe to push
+      let sub;
+      try {
+        sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+          });
+        }
+      } catch (e) {
+        console.error('Push subscribe failed:', e);
+        text.textContent = 'Subscription failed: ' + e.message;
+        btn.disabled = false; btn.textContent = 'Try Again';
+        return;
+      }
+
+      // Step 5: Save to Supabase
+      try {
+        await sbFetch('push_subscriptions', {
+          method: 'POST',
+          headers: { 'Prefer': 'resolution=merge-duplicates' },
+          body: JSON.stringify({
+            user_id:      currentUser,
+            endpoint:     sub.endpoint,
+            subscription: sub.toJSON(),
+          }),
+        });
+      } catch (e) {
+        console.error('Save subscription failed:', e);
+        text.textContent = 'Could not save subscription: ' + e.message;
+        btn.disabled = false; btn.textContent = 'Try Again';
+        return;
+      }
+
+      console.log('Push subscription saved for', currentUser);
+      updateNotifUI();
+
+    } catch (e) {
+      console.error('Push setup failed:', e);
+      text.textContent = 'Error: ' + e.message;
+      btn.disabled = false; btn.textContent = 'Try Again';
+    }
   }
 
   async function doRegisterPush() {
+    // Silent re-registration on load if already permitted
     if (!currentUser) return;
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
     try {
-      const reg = await navigator.serviceWorker.register('/sw.js');
+      const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
       await navigator.serviceWorker.ready;
-
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') { updateNotifUI(); return; }
-
-      const existing = await reg.pushManager.getSubscription();
-      const sub = existing ?? await reg.pushManager.subscribe({
-        userVisibleOnly:      true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-      });
-
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+      }
       await sbFetch('push_subscriptions', {
         method: 'POST',
         headers: { 'Prefer': 'resolution=merge-duplicates' },
         body: JSON.stringify({
-          user_id:      currentUser,
-          endpoint:     sub.endpoint,
-          subscription: sub.toJSON(),
+          user_id: currentUser, endpoint: sub.endpoint, subscription: sub.toJSON(),
         }),
       });
-      console.log('Push subscription saved for', currentUser);
     } catch (e) {
-      console.error('Push registration failed:', e);
+      console.error('Silent re-register failed:', e);
     }
   }
 
   async function registerPush() {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      await doRegisterPush();
-    }
+    await doRegisterPush();
   }
 
   // ── Init ──────────────────────────────────────────────────────
