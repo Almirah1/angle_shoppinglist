@@ -502,6 +502,25 @@
 <!-- ── SETTINGS PAGE ── -->
 <div id="page-settings" class="page">
   <div id="page-settings-inner">
+
+    <!-- Notifications -->
+    <div class="settings-section">
+      <div class="settings-section-title">Notifications</div>
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:14px;line-height:1.5">
+        Get notified when the other person adds or buys something. Must be opened from your home screen icon.
+      </p>
+      <div id="notif-status" style="font-size:13px;color:var(--text-dim);margin-bottom:12px;display:flex;align-items:center;gap:6px">
+        <span id="notif-dot" style="width:8px;height:8px;border-radius:50%;background:var(--text-muted);display:inline-block;flex-shrink:0"></span>
+        <span id="notif-status-text">Checking...</span>
+      </div>
+      <button id="notif-btn" onclick="requestPushPermission()"
+        style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;
+               padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;
+               transition:all 0.15s;display:none">
+        Enable Notifications
+      </button>
+    </div>
+
     <div class="settings-section">
       <div class="settings-section-title">Categories</div>
       <div id="cat-list"></div>
@@ -656,7 +675,7 @@
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(`page-${name}`).classList.add('active');
     document.getElementById(`nav-${name}`).classList.add('active');
-    if (name === 'settings') renderSettingsPage();
+    if (name === 'settings') { renderSettingsPage(); updateNotifUI(); }
     closeColorPicker();
   }
 
@@ -1046,19 +1065,53 @@
     return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
   }
 
-  async function registerPush() {
-    if (!currentUser) return;
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      console.log('Push not supported');
+  function updateNotifUI() {
+    const dot  = document.getElementById('notif-dot');
+    const text = document.getElementById('notif-status-text');
+    const btn  = document.getElementById('notif-btn');
+    if (!dot || !text || !btn) return;
+
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+      dot.style.background  = '#f87171';
+      text.textContent = 'Not supported on this device/browser. Open from home screen.';
+      btn.style.display = 'none';
       return;
     }
 
+    const perm = Notification.permission;
+    if (perm === 'granted') {
+      dot.style.background  = '#4ade80';
+      text.textContent = 'Notifications enabled ✓';
+      btn.style.display = 'none';
+    } else if (perm === 'denied') {
+      dot.style.background  = '#f87171';
+      text.textContent = 'Notifications blocked — enable in iPhone Settings';
+      btn.style.display = 'none';
+    } else {
+      dot.style.background  = '#facc15';
+      text.textContent = 'Notifications not yet enabled';
+      btn.style.display = currentUser ? 'block' : 'none';
+    }
+  }
+
+  async function requestPushPermission() {
+    if (!currentUser) { alert('Please select your name first (top right)'); return; }
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      alert('Push notifications are not supported. Make sure you have added the app to your home screen.');
+      return;
+    }
+    await doRegisterPush();
+    updateNotifUI();
+  }
+
+  async function doRegisterPush() {
+    if (!currentUser) return;
     try {
       const reg = await navigator.serviceWorker.register('/sw.js');
       await navigator.serviceWorker.ready;
 
       const permission = await Notification.requestPermission();
-      if (permission !== 'granted') { console.log('Push permission denied'); return; }
+      if (permission !== 'granted') { updateNotifUI(); return; }
 
       const existing = await reg.pushManager.getSubscription();
       const sub = existing ?? await reg.pushManager.subscribe({
@@ -1066,7 +1119,6 @@
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
 
-      // Save subscription to Supabase
       await sbFetch('push_subscriptions', {
         method: 'POST',
         headers: { 'Prefer': 'resolution=merge-duplicates' },
@@ -1079,6 +1131,12 @@
       console.log('Push subscription saved for', currentUser);
     } catch (e) {
       console.error('Push registration failed:', e);
+    }
+  }
+
+  async function registerPush() {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      await doRegisterPush();
     }
   }
 
